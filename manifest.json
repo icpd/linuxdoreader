@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "LinuxDoAutoRead",
+  "version": "1.0",
+  "description": "Auto read and like forum posts",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": ["https://linux.do/*"],
+  "icons": {
+    "128": "icons/icon.png"
+  },
+  "action": {
+    "default_icon": "icons/icon.png",
+    "default_popup": "popup/popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://linux.do/*", "https://greasyfork.org/*"],
+      "js": ["content.js"],
+      "css": ["styles/content.css"]
+    }
+  ]
+}
