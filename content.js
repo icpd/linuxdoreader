@@ -4,8 +4,9 @@ const SCROLL_DELAY = 100;
 const NEW_OPEN_DELAY = 3000;
 const PAGE_REFRESH_DELAY = 60 * 1000;
 const SLEEP_TIME = 60 * 60 * 1000;
+const TYPE1 = "https://linux.do/latest";
+const TYPE2 = "https://linux.do/unseen";
 
-// 替换 GM_getValue 和 GM_setValue
 async function getValue(key, defaultValue) {
   const result = await chrome.storage.local.get([key]);
   return result[key] === undefined ? defaultValue : result[key];
@@ -87,23 +88,17 @@ async function main() {
       return;
     }
 
-    if (
-      location.href === "https://linux.do/new" ||
-      location.href === "https://linux.do/unread"
-    ) {
+    if (location.href === TYPE1 || location.href === TYPE2) {
       const link = getLastPostLink();
       if (link) {
         await delay(NEW_OPEN_DELAY);
         location.href = link;
       } else {
         await delay(PAGE_REFRESH_DELAY);
-        location.href =
-          location.href === "https://linux.do/new"
-            ? "https://linux.do/unread"
-            : "https://linux.do/new";
+        location.href = location.href === TYPE1 ? TYPE2 : TYPE1;
       }
     } else {
-      location.href = "https://linux.do/unread";
+      location.href = TYPE2;
     }
   } catch (error) {
     console.error("An error occurred:", error);

@@ -17,7 +17,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://linux.do/*", "https://greasyfork.org/*"],
+      "matches": ["https://linux.do/*"],
       "js": ["content.js"],
       "css": ["styles/content.css"]
     }
