@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "LinuxDoAutoRead",
+  "name": "LinuxDoReader",
   "version": "1.0",
   "description": "Auto read and like forum posts",
   "permissions": ["storage", "tabs"],
