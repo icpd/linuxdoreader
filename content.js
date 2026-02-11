@@ -139,7 +139,8 @@ function updateButtonVisual(btn, label, isActive) {
  */
 async function runAutoLike() {
   setInterval(async () => {
-    if (!(await storage.get("autolike", false))) return;
+    const isAutoLike = await storage.get("autolike", false);
+    if (!isAutoLike) return;
 
     const repliesContainer = document.querySelector(SELECTORS.REPLIES_CONTAINER);
     if (!repliesContainer) return;
@@ -170,9 +171,17 @@ function checkAndHandleLikeLimit() {
 /**
  * 自动滚动浏览逻辑 (拟人化优化)
  */
+let isScrolling = false;
 function startAutoScroll() {
+  if (isScrolling) return; // 防止重复启动
+
   const runScroll = async () => {
-    if (!(await storage.get("autoread", false))) return;
+    const isAutoRead = await storage.get("autoread", false);
+    if (!isAutoRead) {
+      isScrolling = false;
+      return;
+    }
+    isScrolling = true;
 
     // 1. 随机滚动距离和延迟
     const step = getRandomInt(CONFIG.SCROLL.STEP_MIN, CONFIG.SCROLL.STEP_MAX);
@@ -215,6 +224,13 @@ function startAutoScroll() {
 
   runScroll();
 }
+
+// 监听 autoread 变化，以便在开启时立即启动滚动
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.autoread && changes.autoread.newValue === true) {
+    startAutoScroll();
+  }
+});
 
 /**
  * 获取目标帖子链接 (全列表随机)
