@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LinuxDoReader",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Auto read and like forum posts",
   "permissions": ["storage", "tabs"],
   "host_permissions": ["https://linux.do/*"],

@@ -13,6 +13,13 @@ const CONFIG = {
     PAUSE_MIN: 1000,
     PAUSE_MAX: 3000,
   },
+  LIKE: {
+    COOLDOWN_HOURS: 24, // 触顶后暂停 24 小时
+    MIN_COUNT: 5, // 跟风点赞阈值：至少已有 5 个赞
+    PROBABILITY: 0.8, // 点赞概率 80%
+    DELAY_MIN: 5000, // 点赞延迟 5秒
+    DELAY_MAX: 15000, // 点赞延迟 15秒
+  },
   URLS: {
     LATEST: "https://linux.do/latest",
     UNSEEN: "https://linux.do/unseen",
@@ -29,6 +36,7 @@ const SELECTORS = {
   REPLIES_CONTAINER: ".timeline-replies",
   POST_ID_PREFIX: "#post_",
   LIKE_BUTTON: ".discourse-reactions-reaction-button",
+  LIKE_COUNTER: ".reactions-counter", // 点赞计数器
   TOPIC_LINKS: "a[data-topic-id]",
 };
 
@@ -137,10 +145,19 @@ function updateButtonVisual(btn, label, isActive) {
 /**
  * 自动点赞逻辑
  */
+let isLiking = false; // 防止重复点赞同一帖子
 async function runAutoLike() {
   setInterval(async () => {
+    // 1. 基础开关检查
     const isAutoLike = await storage.get("autolike", false);
     if (!isAutoLike) return;
+
+    // 2. 冷却时间检查
+    const resumeTime = await storage.get("like_resume_time", 0);
+    if (Date.now() < resumeTime) return;
+
+    // 3. 正在处理中则跳过
+    if (isLiking) return;
 
     const repliesContainer = document.querySelector(SELECTORS.REPLIES_CONTAINER);
     if (!repliesContainer) return;
@@ -149,13 +166,49 @@ async function runAutoLike() {
     const currentPostId = repliesContainer.textContent.match(/\d+/g)?.[0];
     if (!currentPostId) return;
 
-    const likeBtn = document
-      .querySelector(`${SELECTORS.POST_ID_PREFIX}${currentPostId}`)
-      ?.querySelector(SELECTORS.LIKE_BUTTON);
+    const postElement = document.querySelector(
+      `${SELECTORS.POST_ID_PREFIX}${currentPostId}`,
+    );
+    if (!postElement) return;
 
+    const likeBtn = postElement.querySelector(SELECTORS.LIKE_BUTTON);
+
+    // 4. 检查是否可以点赞
     if (likeBtn?.title === CONFIG.STRINGS.LIKE_TITLE_TRIGGER) {
-      likeBtn.click();
-      checkAndHandleLikeLimit();
+      isLiking = true;
+
+      // 5. 跟风点赞检查 (Social Proof)
+      const counterEl = postElement.querySelector(SELECTORS.LIKE_COUNTER);
+      let likeCount = 0;
+      if (counterEl) {
+        likeCount = parseInt(counterEl.innerText.trim(), 10) || 0;
+      }
+
+      if (likeCount < CONFIG.LIKE.MIN_COUNT) {
+        isLiking = false;
+        return; // 赞数太少，不点
+      }
+
+      // 6. 概率检查
+      if (Math.random() > CONFIG.LIKE.PROBABILITY) {
+        isLiking = false;
+        return; // 运气不好，不点
+      }
+
+      // 7. 随机延迟执行
+      const delay = getRandomInt(
+        CONFIG.LIKE.DELAY_MIN,
+        CONFIG.LIKE.DELAY_MAX,
+      );
+
+      setTimeout(() => {
+        // 再次检查按钮状态（防止延迟期间滑走或已点）
+        if (likeBtn.title === CONFIG.STRINGS.LIKE_TITLE_TRIGGER) {
+          likeBtn.click();
+          checkAndHandleLikeLimit();
+        }
+        isLiking = false; // 重置状态
+      }, delay);
     }
   }, 1000);
 }
@@ -163,8 +216,13 @@ async function runAutoLike() {
 function checkAndHandleLikeLimit() {
   const dialog = document.querySelector(SELECTORS.LIKE_LIMIT_DIALOG);
   if (dialog && dialog.innerText.includes(CONFIG.STRINGS.LIKE_LIMIT_TEXT)) {
-    console.warn("[LinuxDoReader] 达到点赞上限，已自动关闭");
-    storage.set("autolike", false);
+    console.warn(
+      `[LinuxDoReader] 达到点赞上限，暂停 ${CONFIG.LIKE.COOLDOWN_HOURS} 小时`,
+    );
+    // 设置恢复时间为当前时间 + 冷却小时数
+    const resumeTime =
+      Date.now() + CONFIG.LIKE.COOLDOWN_HOURS * 60 * 60 * 1000;
+    storage.set("like_resume_time", resumeTime);
   }
 }
 
