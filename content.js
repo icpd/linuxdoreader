@@ -240,6 +240,7 @@ function startAutoScroll() {
 
     if (!isAutoRead || !isTopicPage) {
       isScrolling = false;
+      if (isAutoRead) handleNavigation();
       return;
     }
     isScrolling = true;
