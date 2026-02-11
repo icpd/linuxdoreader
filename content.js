@@ -111,7 +111,8 @@ function startAutoScroll() {
         document.body.scrollHeight
       ) {
         setTimeout(() => {
-          location.href = document.referrer || CONFIG.URLS.LATEST;
+          // 读完后优先去未读列表，确保清理未读
+          location.href = CONFIG.URLS.UNSEEN;
         }, CONFIG.DELAYS.NEW_OPEN);
         return; // 结束滚动循环
       }
