@@ -1,31 +1,33 @@
+const storage = {
+  get: (keys) => chrome.storage.local.get(keys),
+  set: (items) => chrome.storage.local.set(items),
+};
+
 document.addEventListener("DOMContentLoaded", async () => {
-  const autoReadBtn = document.getElementById("toggleAutoRead");
-  const autoLikeBtn = document.getElementById("toggleAutoLike");
+  const config = [
+    { id: "toggleAutoRead", key: "autoread", label: "Auto-Read" },
+    { id: "toggleAutoLike", key: "autolike", label: "Auto-Like" },
+  ];
 
-  // 初始化按钮状态
-  const state = await chrome.storage.local.get(["autoread", "autolike"]);
-  updateButtonState(autoReadBtn, state.autoread);
-  updateButtonState(autoLikeBtn, state.autolike);
+  const currentState = await storage.get(config.map((c) => c.key));
 
-  autoReadBtn.addEventListener("click", async () => {
-    const current = await toggleSetting("autoread");
-    updateButtonState(autoReadBtn, current);
-  });
+  config.forEach((item) => {
+    const btn = document.getElementById(item.id);
 
-  autoLikeBtn.addEventListener("click", async () => {
-    const current = await toggleSetting("autolike");
-    updateButtonState(autoLikeBtn, current);
+    // 初始化 UI
+    updateUI(btn, item.label, currentState[item.key]);
+
+    // 绑定点击事件
+    btn.addEventListener("click", async () => {
+      const state = await storage.get(item.key);
+      const newState = !state[item.key];
+      await storage.set({ [item.key]: newState });
+      updateUI(btn, item.label, newState);
+    });
   });
 });
 
-function updateButtonState(button, state) {
-  button.textContent = `${button.id.replace("toggle", "")}: ${state ? "ON" : "OFF"}`;
-  button.classList.toggle("active", state);
-}
-
-async function toggleSetting(key) {
-  const state = await chrome.storage.local.get([key]);
-  const newState = !state[key];
-  await chrome.storage.local.set({ [key]: newState });
-  return newState;
+function updateUI(button, label, isActive) {
+  button.textContent = `${label}: ${isActive ? "ON" : "OFF"}`;
+  button.classList.toggle("active", isActive);
 }

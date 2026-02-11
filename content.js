@@ -1,152 +1,148 @@
-const delay = (time) => new Promise((resolve) => setTimeout(resolve, time));
+// --- 1. 配置与选择器 ---
+const CONFIG = {
+  DELAYS: {
+    SCROLL: 100,
+    NEW_OPEN: 3000,
+    PAGE_REFRESH: 60 * 1000,
+  },
+  URLS: {
+    LATEST: "https://linux.do/latest",
+    UNSEEN: "https://linux.do/unseen",
+    TOPIC_PATTERN: /^https:\/\/linux\.do\/t\/topic\/.+$/,
+  },
+  STRINGS: {
+    LIKE_LIMIT_TEXT: "点赞上限",
+    LIKE_TITLE_TRIGGER: "点赞此帖子",
+  },
+};
 
-const SCROLL_DELAY = 100;
-const NEW_OPEN_DELAY = 3000;
-const PAGE_REFRESH_DELAY = 60 * 1000;
-const SLEEP_TIME = 60 * 60 * 1000;
-const TYPE1 = "https://linux.do/latest";
-const TYPE2 = "https://linux.do/unseen";
+const SELECTORS = {
+  LIKE_LIMIT_DIALOG: ".dialog-body",
+  REPLIES_CONTAINER: ".timeline-replies",
+  POST_ID_PREFIX: "#post_",
+  LIKE_BUTTON: ".discourse-reactions-reaction-button",
+  TOPIC_LINKS: "a[data-topic-id]",
+};
 
-async function getValue(key, defaultValue) {
-  const result = await chrome.storage.local.get([key]);
-  return result[key] === undefined ? defaultValue : result[key];
+// --- 2. 存储工具函数 ---
+const storage = {
+  get: async (key, defaultValue) => {
+    const result = await chrome.storage.local.get([key]);
+    return result[key] === undefined ? defaultValue : result[key];
+  },
+  set: async (key, value) => {
+    await chrome.storage.local.set({ [key]: value });
+  },
+};
+
+// --- 3. 业务逻辑模块 ---
+
+/**
+ * 自动点赞逻辑
+ */
+async function runAutoLike() {
+  setInterval(async () => {
+    if (!(await storage.get("autolike", false))) return;
+
+    const repliesContainer = document.querySelector(SELECTORS.REPLIES_CONTAINER);
+    if (!repliesContainer) return;
+
+    // 获取当前正在浏览的回复 ID
+    const currentPostId = repliesContainer.textContent.match(/\d+/g)?.[0];
+    if (!currentPostId) return;
+
+    const likeBtn = document
+      .querySelector(`${SELECTORS.POST_ID_PREFIX}${currentPostId}`)
+      ?.querySelector(SELECTORS.LIKE_BUTTON);
+
+    if (likeBtn?.title === CONFIG.STRINGS.LIKE_TITLE_TRIGGER) {
+      likeBtn.click();
+      checkAndHandleLikeLimit();
+    }
+  }, 1000);
 }
 
-async function setValue(key, value) {
-  await chrome.storage.local.set({ [key]: value });
-}
-
-// 检查点赞上限
-function checkLikeLimit() {
-  const likeLimitText = "点赞上限";
-  const dialogBody = document.querySelector(".dialog-body");
-
-  if (dialogBody && dialogBody.innerText.includes(likeLimitText)) {
-    console.log("Reached like limit, stopping auto-like.");
-    setValue("autolike", false);
+function checkAndHandleLikeLimit() {
+  const dialog = document.querySelector(SELECTORS.LIKE_LIMIT_DIALOG);
+  if (dialog && dialog.innerText.includes(CONFIG.STRINGS.LIKE_LIMIT_TEXT)) {
+    console.warn("[LinuxDoReader] 达到点赞上限，已自动关闭");
+    storage.set("autolike", false);
   }
 }
 
-// 滚动页面
-function scrollPage() {
+/**
+ * 自动滚动浏览逻辑
+ */
+function startAutoScroll() {
   const scrollInterval = setInterval(async () => {
-    const isAutoRead = await getValue("autoread", false);
-    if (!isAutoRead) {
+    if (!(await storage.get("autoread", false))) {
       clearInterval(scrollInterval);
       return;
     }
 
     window.scrollBy(0, 15);
 
+    // 触底判断
     if (window.scrollY + window.innerHeight + 5 >= document.body.scrollHeight) {
       clearInterval(scrollInterval);
       setTimeout(() => {
-        location.href = document.referrer;
-      }, NEW_OPEN_DELAY);
+        location.href = document.referrer || CONFIG.URLS.LATEST;
+      }, CONFIG.DELAYS.NEW_OPEN);
     }
-  }, SCROLL_DELAY);
+  }, CONFIG.DELAYS.SCROLL);
 }
 
-// 自动点赞
-async function autoLike() {
-  setInterval(async () => {
-    const isAutoLike = await getValue("autolike", false);
-    if (!isAutoLike) {
-      return;
-    }
-
-    const repliesContainer = document.querySelector(".timeline-replies");
-    if (!repliesContainer) return;
-
-    const currentReplied = repliesContainer.textContent.match(/\d+/g)?.[0];
-    if (!currentReplied) return;
-
-    const btn = document
-      .querySelector("#post_" + currentReplied)
-      ?.querySelector(".discourse-reactions-reaction-button");
-    if (btn?.title === "点赞此帖子") {
-      btn.click();
-      checkLikeLimit();
-    }
-  }, 1000);
+/**
+ * 获取目标帖子链接
+ */
+function getTargetTopicLink() {
+  const posts = document.querySelectorAll(SELECTORS.TOPIC_LINKS);
+  return posts.length > 0 ? posts[posts.length - 1].href : null;
 }
 
-// 主函数
-async function main() {
-  try {
-    if (document.readyState !== "complete") {
-      await new Promise((resolve) => (window.onload = resolve));
-    }
+/**
+ * 导航逻辑
+ */
+async function handleNavigation() {
+  const isAutoRead = await storage.get("autoread", false);
+  if (!isAutoRead) return;
 
-    autoLike();
+  const currentUrl = location.href;
 
-    const isAutoRead = await getValue("autoread", false);
-    if (!isAutoRead) return;
+  // 1. 如果在话题详情页
+  if (CONFIG.URLS.TOPIC_PATTERN.test(currentUrl)) {
+    startAutoScroll();
+    return;
+  }
 
-    if (/^https:\/\/linux\.do\/t\/topic\/.+$/.test(location.href)) {
-      scrollPage();
-      return;
-    }
-
-    if (location.href === TYPE1 || location.href === TYPE2) {
-      const link = getLastPostLink();
-      if (link) {
-        await delay(NEW_OPEN_DELAY);
-        location.href = link;
-      } else {
-        await delay(PAGE_REFRESH_DELAY);
-        location.href = location.href === TYPE1 ? TYPE2 : TYPE1;
-      }
+  // 2. 如果在列表页
+  if (currentUrl === CONFIG.URLS.LATEST || currentUrl === CONFIG.URLS.UNSEEN) {
+    const link = getTargetTopicLink();
+    if (link) {
+      setTimeout(() => (location.href = link), CONFIG.DELAYS.NEW_OPEN);
     } else {
-      location.href = TYPE2;
+      // 找不到帖子，在两个列表间切换刷新
+      setTimeout(() => {
+        location.href =
+          currentUrl === CONFIG.URLS.LATEST
+            ? CONFIG.URLS.UNSEEN
+            : CONFIG.URLS.LATEST;
+      }, CONFIG.DELAYS.PAGE_REFRESH);
     }
-  } catch (error) {
-    console.error("An error occurred:", error);
-  }
-}
-
-// 获取第一个帖子的链接
-function getFirstPostLink() {
-  try {
-    // 根据你的论坛的HTML结构，找到帖子链接的选择器
-    const post = document.querySelector(
-      "td.main-link.clearfix.topic-list-data > span > a",
-    );
-    if (post != null) {
-      return post.href;
-    }
-
-    return null;
-  } catch (error) {
-    console.error("Failed to get the first post link:", error);
-    return null;
-  }
-}
-
-function getLastPostLink() {
-  try {
-    const posts = document.querySelectorAll("a[data-topic-id]");
-    if (posts.length > 0) {
-      return posts[posts.length - 1].href;
-    }
-    return null;
-  } catch (error) {
-    console.error("Failed to get the last post link:", error);
-    return null;
-  }
-}
-
-// 检查是否在工作时间内
-function isWorkingHours() {
-  return true;
-
-  const hour = new Date().getHours();
-  // 晚上8点到第二天早上10点不工作
-  if (hour >= 23 || hour < 6) {
-    return false;
   } else {
-    return true;
+    // 3. 其他页面默认跳到未读
+    location.href = CONFIG.URLS.UNSEEN;
   }
 }
 
-main();
+// --- 4. 主入口 ---
+async function init() {
+  if (document.readyState !== "complete") {
+    await new Promise((r) => window.addEventListener("load", r));
+  }
+
+  runAutoLike();
+  handleNavigation();
+}
+
+init().catch(console.error);
