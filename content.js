@@ -234,14 +234,17 @@ function startAutoScroll() {
   if (isScrolling) return; // 防止重复启动
 
   const runScroll = async () => {
+    // 1. 基础检查：开关是否开启，以及是否还在话题页
     const isAutoRead = await storage.get("autoread", false);
-    if (!isAutoRead) {
+    const isTopicPage = CONFIG.URLS.TOPIC_PATTERN.test(location.href);
+
+    if (!isAutoRead || !isTopicPage) {
       isScrolling = false;
       return;
     }
     isScrolling = true;
 
-    // 1. 随机滚动距离和延迟
+    // 2. 随机滚动距离和延迟
     const step = getRandomInt(CONFIG.SCROLL.STEP_MIN, CONFIG.SCROLL.STEP_MAX);
     const delay = getRandomInt(
       CONFIG.SCROLL.DELAY_MIN,
