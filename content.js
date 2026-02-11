@@ -286,10 +286,10 @@ function startAutoScroll() {
   runScroll();
 }
 
-// 监听 autoread 变化，以便在开启时立即启动滚动
+// 监听 autoread 变化，以便在开启时立即启动滚动或导航
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.autoread && changes.autoread.newValue === true) {
-    startAutoScroll();
+    handleNavigation();
   }
 });
 
