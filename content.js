@@ -52,6 +52,89 @@ const getRandomInt = (min, max) =>
   Math.floor(Math.random() * (max - min + 1)) + min;
 
 /**
+ * 创建悬浮控制面板
+ */
+async function createFloatingPanel() {
+  const isShow = await storage.get("showfloat", true);
+  
+  const initPanel = async () => {
+    let panel = document.getElementById("linux-do-reader-float-panel");
+    if (panel) return panel;
+
+    panel = document.createElement("div");
+    panel.id = "linux-do-reader-float-panel";
+    document.body.appendChild(panel);
+
+    const configs = [
+      { key: "autoread", label: "Auto-Read" },
+      { key: "autolike", label: "Auto-Like" },
+    ];
+
+    for (const config of configs) {
+      const btn = document.createElement("div");
+      btn.className = "linux-do-reader-float-btn";
+      btn.dataset.key = config.key;
+      btn.textContent = `${config.label}: OFF`;
+      panel.appendChild(btn);
+
+      // 初始化状态
+      const isActive = await storage.get(config.key, false);
+      updateButtonVisual(btn, config.label, isActive);
+
+      // 点击事件
+      btn.addEventListener("click", async () => {
+        const currentState = await storage.get(config.key, false);
+        const newState = !currentState;
+        await storage.set(config.key, newState);
+        updateButtonVisual(btn, config.label, newState);
+      });
+    }
+    return panel;
+  };
+
+  if (isShow) await initPanel();
+
+  // 监听来自 popup 的变更
+  chrome.storage.onChanged.addListener(async (changes) => {
+    // 处理面板显示/隐藏
+    if (changes.showfloat) {
+      if (changes.showfloat.newValue) {
+        await initPanel();
+      } else {
+        document.getElementById("linux-do-reader-float-panel")?.remove();
+      }
+    }
+
+    // 处理按钮状态同步
+    const panel = document.getElementById("linux-do-reader-float-panel");
+    if (!panel) return;
+
+    const btnConfigs = [
+      { key: "autoread", label: "Auto-Read" },
+      { key: "autolike", label: "Auto-Like" },
+    ];
+
+    btnConfigs.forEach((config) => {
+      if (changes[config.key]) {
+        const btn = panel.querySelector(`[data-key="${config.key}"]`);
+        if (btn) {
+          updateButtonVisual(btn, config.label, changes[config.key].newValue);
+        }
+      }
+    });
+  });
+}
+
+function updateButtonVisual(btn, label, isActive) {
+  btn.textContent = `${label}: ${isActive ? "ON" : "OFF"}`;
+  if (isActive) {
+    btn.classList.add("active");
+  } else {
+    btn.classList.remove("active");
+  }
+}
+
+/**
  * 自动点赞逻辑
  */
 async function runAutoLike() {
@@ -187,6 +270,7 @@ async function init() {
 
   runAutoLike();
   handleNavigation();
+  createFloatingPanel();
 }
 
 init().catch(console.error);

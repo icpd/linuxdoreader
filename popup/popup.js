@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const config = [
     { id: "toggleAutoRead", key: "autoread", label: "Auto-Read" },
     { id: "toggleAutoLike", key: "autolike", label: "Auto-Like" },
+    { id: "toggleShowFloat", key: "showfloat", label: "Show Float" },
   ];
 
   const currentState = await storage.get(config.map((c) => c.key));
