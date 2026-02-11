@@ -1,9 +1,17 @@
 // --- 1. 配置与选择器 ---
 const CONFIG = {
   DELAYS: {
-    SCROLL: 100,
     NEW_OPEN: 3000,
     PAGE_REFRESH: 60 * 1000,
+  },
+  SCROLL: {
+    STEP_MIN: 10,
+    STEP_MAX: 30,
+    DELAY_MIN: 50,
+    DELAY_MAX: 150,
+    PAUSE_PROBABILITY: 0.05, // 5% 概率暂停模拟阅读
+    PAUSE_MIN: 1000,
+    PAUSE_MAX: 3000,
   },
   URLS: {
     LATEST: "https://linux.do/latest",
@@ -36,6 +44,12 @@ const storage = {
 };
 
 // --- 3. 业务逻辑模块 ---
+
+/**
+ * 随机整数生成器
+ */
+const getRandomInt = (min, max) =>
+  Math.floor(Math.random() * (max - min + 1)) + min;
 
 /**
  * 自动点赞逻辑
@@ -71,25 +85,42 @@ function checkAndHandleLikeLimit() {
 }
 
 /**
- * 自动滚动浏览逻辑
+ * 自动滚动浏览逻辑 (拟人化优化)
  */
 function startAutoScroll() {
-  const scrollInterval = setInterval(async () => {
-    if (!(await storage.get("autoread", false))) {
-      clearInterval(scrollInterval);
-      return;
-    }
+  const runScroll = async () => {
+    if (!(await storage.get("autoread", false))) return;
 
-    window.scrollBy(0, 15);
+    // 1. 随机滚动距离和延迟
+    const step = getRandomInt(CONFIG.SCROLL.STEP_MIN, CONFIG.SCROLL.STEP_MAX);
+    const delay = getRandomInt(
+      CONFIG.SCROLL.DELAY_MIN,
+      CONFIG.SCROLL.DELAY_MAX,
+    );
 
-    // 触底判断
+    window.scrollBy(0, step);
+
+    // 2. 触底判断
     if (window.scrollY + window.innerHeight + 5 >= document.body.scrollHeight) {
-      clearInterval(scrollInterval);
       setTimeout(() => {
         location.href = document.referrer || CONFIG.URLS.LATEST;
       }, CONFIG.DELAYS.NEW_OPEN);
+      return; // 结束滚动循环
     }
-  }, CONFIG.DELAYS.SCROLL);
+
+    // 3. 随机暂停模拟阅读
+    if (Math.random() < CONFIG.SCROLL.PAUSE_PROBABILITY) {
+      const pauseTime = getRandomInt(
+        CONFIG.SCROLL.PAUSE_MIN,
+        CONFIG.SCROLL.PAUSE_MAX,
+      );
+      setTimeout(runScroll, pauseTime);
+    } else {
+      setTimeout(runScroll, delay);
+    }
+  };
+
+  runScroll();
 }
 
 /**
