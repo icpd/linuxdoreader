@@ -133,11 +133,14 @@ function startAutoScroll() {
 }
 
 /**
- * 获取目标帖子链接
+ * 获取目标帖子链接 (全列表随机)
  */
 function getTargetTopicLink() {
   const posts = document.querySelectorAll(SELECTORS.TOPIC_LINKS);
-  return posts.length > 0 ? posts[posts.length - 1].href : null;
+  if (posts.length === 0) return null;
+  // 随机选择一个帖子
+  const randomIndex = getRandomInt(0, posts.length - 1);
+  return posts[randomIndex].href;
 }
 
 /**
