@@ -1,25 +1,26 @@
 // --- 1. 配置与选择器 ---
-const CONFIG = {
-  DELAYS: {
-    NEW_OPEN: 3000,
-    PAGE_REFRESH: 60 * 1000,
-  },
-  SCROLL: {
-    STEP_MIN: 10,
-    STEP_MAX: 30,
-    DELAY_MIN: 50,
-    DELAY_MAX: 150,
-    PAUSE_PROBABILITY: 0.05, // 5% 概率暂停模拟阅读
-    PAUSE_MIN: 1000,
-    PAUSE_MAX: 3000,
-  },
-  LIKE: {
-    COOLDOWN_HOURS: 24, // 触顶后暂停 24 小时
-    MIN_COUNT: 5, // 跟风点赞阈值：至少已有 5 个赞
-    PROBABILITY: 0.8, // 点赞概率 80%
-    DELAY_MIN: 5000, // 点赞延迟 5秒
-    DELAY_MAX: 15000, // 点赞延迟 15秒
-  },
+
+// 默认配置（兜底用，实际会从 storage 加载）
+let CONFIG = {
+  taskDuration: 0,
+  newOpenDelay: 3000,
+  pageRefreshDelay: 60 * 1000,
+  scrollStepMin: 10,
+  scrollStepMax: 30,
+  scrollDelayMin: 50,
+  scrollDelayMax: 150,
+  scrollPauseProbability: 0.05,
+  scrollPauseMin: 1000,
+  scrollPauseMax: 3000,
+  likeMinCount: 5,
+  likeProbability: 0.8,
+  likeDelayMin: 5000,
+  likeDelayMax: 15000,
+  likeCooldownHours: 24,
+};
+
+// URL 和 字符串常量保持不变
+const CONSTANTS = {
   URLS: {
     LATEST: "https://linux.do/latest",
     UNSEEN: "https://linux.do/unseen",
@@ -36,7 +37,7 @@ const SELECTORS = {
   REPLIES_CONTAINER: ".timeline-replies",
   POST_ID_PREFIX: "#post_",
   LIKE_BUTTON: ".discourse-reactions-reaction-button",
-  LIKE_COUNTER: ".reactions-counter", // 点赞计数器
+  LIKE_COUNTER: ".reactions-counter",
   TOPIC_LINKS: "a[data-topic-id]",
 };
 
@@ -49,9 +50,42 @@ const storage = {
   set: async (key, value) => {
     await chrome.storage.local.set({ [key]: value });
   },
+  getAll: async () => {
+    return await chrome.storage.local.get(null);
+  }
 };
 
 // --- 3. 业务逻辑模块 ---
+
+/**
+ * 检查任务是否超时
+ * @returns {Promise<boolean>} true if task expired
+ */
+async function checkTaskDuration() {
+  const data = await storage.getAll();
+  const startTime = data.taskStartTime || 0;
+  const durationMinutes = CONFIG.taskDuration || 0;
+  
+  // 0 表示不限制
+  if (durationMinutes <= 0) return false;
+  if (startTime === 0) return false; // 未记录开始时间
+
+  const elapsed = Date.now() - startTime;
+  const durationMs = durationMinutes * 60 * 1000;
+
+  if (elapsed >= durationMs) {
+    console.log(`[LinuxDoReader] 任务已运行 ${elapsed/1000}s，超过设定时长 ${durationMinutes}min，自动停止。`);
+    
+    // 停止任务
+    await chrome.storage.local.set({
+      autoread: false,
+      autolike: false
+    });
+    
+    return true;
+  }
+  return false;
+}
 
 /**
  * 随机整数生成器
@@ -93,7 +127,14 @@ async function createFloatingPanel() {
       btn.addEventListener("click", async () => {
         const currentState = await storage.get(config.key, false);
         const newState = !currentState;
-        await storage.set(config.key, newState);
+        
+        // 如果是开启任务，记录开始时间
+        const updates = { [config.key]: newState };
+        if (newState) {
+          updates.taskStartTime = Date.now();
+        }
+        await chrome.storage.local.set(updates);
+        
         updateButtonVisual(btn, config.label, newState);
       });
     }
@@ -104,7 +145,13 @@ async function createFloatingPanel() {
 
   // 监听来自 popup 的变更
   chrome.storage.onChanged.addListener(async (changes) => {
-    // 处理面板显示/隐藏
+    // 1. 同步 Config
+    if (changes.config) {
+      CONFIG = { ...CONFIG, ...changes.config.newValue };
+      console.log('[LinuxDoReader] Config updated:', CONFIG);
+    }
+
+    // 2. 处理面板显示/隐藏
     if (changes.showfloat) {
       if (changes.showfloat.newValue) {
         await initPanel();
@@ -113,7 +160,7 @@ async function createFloatingPanel() {
       }
     }
 
-    // 处理按钮状态同步
+    // 3. 处理按钮状态同步
     const panel = document.getElementById("linux-do-reader-float-panel");
     if (!panel) return;
 
@@ -148,6 +195,10 @@ function updateButtonVisual(btn, label, isActive) {
 let isLiking = false; // 防止重复点赞同一帖子
 async function runAutoLike() {
   setInterval(async () => {
+    // 0. 任务时长检查
+    const isExpired = await checkTaskDuration();
+    if (isExpired) return;
+
     // 1. 基础开关检查
     const isAutoLike = await storage.get("autolike", false);
     if (!isAutoLike) return;
@@ -174,7 +225,7 @@ async function runAutoLike() {
     const likeBtn = postElement.querySelector(SELECTORS.LIKE_BUTTON);
 
     // 4. 检查是否可以点赞
-    if (likeBtn?.title === CONFIG.STRINGS.LIKE_TITLE_TRIGGER) {
+    if (likeBtn?.title === CONSTANTS.STRINGS.LIKE_TITLE_TRIGGER) {
       isLiking = true;
 
       // 5. 跟风点赞检查 (Social Proof)
@@ -184,26 +235,26 @@ async function runAutoLike() {
         likeCount = parseInt(counterEl.innerText.trim(), 10) || 0;
       }
 
-      if (likeCount < CONFIG.LIKE.MIN_COUNT) {
+      if (likeCount < CONFIG.likeMinCount) {
         isLiking = false;
         return; // 赞数太少，不点
       }
 
       // 6. 概率检查
-      if (Math.random() > CONFIG.LIKE.PROBABILITY) {
+      if (Math.random() > CONFIG.likeProbability) {
         isLiking = false;
         return; // 运气不好，不点
       }
 
       // 7. 随机延迟执行
       const delay = getRandomInt(
-        CONFIG.LIKE.DELAY_MIN,
-        CONFIG.LIKE.DELAY_MAX,
+        CONFIG.likeDelayMin,
+        CONFIG.likeDelayMax,
       );
 
       setTimeout(() => {
         // 再次检查按钮状态（防止延迟期间滑走或已点）
-        if (likeBtn.title === CONFIG.STRINGS.LIKE_TITLE_TRIGGER) {
+        if (likeBtn.title === CONSTANTS.STRINGS.LIKE_TITLE_TRIGGER) {
           likeBtn.click();
           checkAndHandleLikeLimit();
         }
@@ -215,13 +266,13 @@ async function runAutoLike() {
 
 function checkAndHandleLikeLimit() {
   const dialog = document.querySelector(SELECTORS.LIKE_LIMIT_DIALOG);
-  if (dialog && dialog.innerText.includes(CONFIG.STRINGS.LIKE_LIMIT_TEXT)) {
+  if (dialog && dialog.innerText.includes(CONSTANTS.STRINGS.LIKE_LIMIT_TEXT)) {
     console.warn(
-      `[LinuxDoReader] 达到点赞上限，暂停 ${CONFIG.LIKE.COOLDOWN_HOURS} 小时`,
+      `[LinuxDoReader] 达到点赞上限，暂停 ${CONFIG.likeCooldownHours} 小时`,
     );
     // 设置恢复时间为当前时间 + 冷却小时数
     const resumeTime =
-      Date.now() + CONFIG.LIKE.COOLDOWN_HOURS * 60 * 60 * 1000;
+      Date.now() + CONFIG.likeCooldownHours * 60 * 60 * 1000;
     storage.set("like_resume_time", resumeTime);
   }
 }
@@ -234,9 +285,16 @@ function startAutoScroll() {
   if (isScrolling) return; // 防止重复启动
 
   const runScroll = async () => {
+    // 0. 任务时长检查
+    const isExpired = await checkTaskDuration();
+    if (isExpired) {
+      isScrolling = false;
+      return;
+    }
+
     // 1. 基础检查：开关是否开启，以及是否还在话题页
     const isAutoRead = await storage.get("autoread", false);
-    const isTopicPage = CONFIG.URLS.TOPIC_PATTERN.test(location.href);
+    const isTopicPage = CONSTANTS.URLS.TOPIC_PATTERN.test(location.href);
 
     if (!isAutoRead || !isTopicPage) {
       isScrolling = false;
@@ -246,10 +304,10 @@ function startAutoScroll() {
     isScrolling = true;
 
     // 2. 随机滚动距离和延迟
-    const step = getRandomInt(CONFIG.SCROLL.STEP_MIN, CONFIG.SCROLL.STEP_MAX);
+    const step = getRandomInt(CONFIG.scrollStepMin, CONFIG.scrollStepMax);
     const delay = getRandomInt(
-      CONFIG.SCROLL.DELAY_MIN,
-      CONFIG.SCROLL.DELAY_MAX,
+      CONFIG.scrollDelayMin,
+      CONFIG.scrollDelayMax,
     );
 
     window.scrollBy(0, step);
@@ -266,17 +324,17 @@ function startAutoScroll() {
       ) {
         setTimeout(() => {
           // 读完后优先去未读列表，确保清理未读
-          location.href = CONFIG.URLS.UNSEEN;
-        }, CONFIG.DELAYS.NEW_OPEN);
+          location.href = CONSTANTS.URLS.UNSEEN;
+        }, CONFIG.newOpenDelay);
         return; // 结束滚动循环
       }
     }
 
     // 3. 随机暂停模拟阅读
-    if (Math.random() < CONFIG.SCROLL.PAUSE_PROBABILITY) {
+    if (Math.random() < CONFIG.scrollPauseProbability) {
       const pauseTime = getRandomInt(
-        CONFIG.SCROLL.PAUSE_MIN,
-        CONFIG.SCROLL.PAUSE_MAX,
+        CONFIG.scrollPauseMin,
+        CONFIG.scrollPauseMax,
       );
       setTimeout(runScroll, pauseTime);
     } else {
@@ -309,39 +367,49 @@ function getTargetTopicLink() {
  * 导航逻辑
  */
 async function handleNavigation() {
+  // 0. 任务时长检查
+  const isExpired = await checkTaskDuration();
+  if (isExpired) return;
+
   const isAutoRead = await storage.get("autoread", false);
   if (!isAutoRead) return;
 
   const currentUrl = location.href;
 
   // 1. 如果在话题详情页
-  if (CONFIG.URLS.TOPIC_PATTERN.test(currentUrl)) {
+  if (CONSTANTS.URLS.TOPIC_PATTERN.test(currentUrl)) {
     startAutoScroll();
     return;
   }
 
   // 2. 如果在列表页
-  if (currentUrl === CONFIG.URLS.LATEST || currentUrl === CONFIG.URLS.UNSEEN) {
+  if (currentUrl === CONSTANTS.URLS.LATEST || currentUrl === CONSTANTS.URLS.UNSEEN) {
     const link = getTargetTopicLink();
     if (link) {
-      setTimeout(() => (location.href = link), CONFIG.DELAYS.NEW_OPEN);
+      setTimeout(() => (location.href = link), CONFIG.newOpenDelay);
     } else {
       // 找不到帖子，在两个列表间切换刷新
       setTimeout(() => {
         location.href =
-          currentUrl === CONFIG.URLS.LATEST
-            ? CONFIG.URLS.UNSEEN
-            : CONFIG.URLS.LATEST;
-      }, CONFIG.DELAYS.PAGE_REFRESH);
+          currentUrl === CONSTANTS.URLS.LATEST
+            ? CONSTANTS.URLS.UNSEEN
+            : CONSTANTS.URLS.LATEST;
+      }, CONFIG.pageRefreshDelay);
     }
   } else {
     // 3. 其他页面默认跳到未读
-    location.href = CONFIG.URLS.UNSEEN;
+    location.href = CONSTANTS.URLS.UNSEEN;
   }
 }
 
 // --- 4. 主入口 ---
 async function init() {
+  // 1. 加载配置
+  const stored = await storage.get("config");
+  if (stored) {
+    CONFIG = { ...CONFIG, ...stored };
+  }
+
   if (document.readyState !== "complete") {
     await new Promise((r) => window.addEventListener("load", r));
   }

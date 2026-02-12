@@ -1,31 +1,175 @@
 <!doctype html>
 <html>
-    <head>
-        <meta charset="UTF-8" />
-        <style>
-            body {
-                width: 200px;
-                padding: 10px;
-            }
-            button {
-                width: 100%;
-                margin: 5px 0;
-                padding: 8px;
-                border: none;
-                border-radius: 4px;
-                background-color: #f0f0f0;
-                cursor: pointer;
-            }
-            button.active {
-                background-color: #4caf50;
-                color: white;
-            }
-        </style>
-    </head>
-    <body>
-        <button id="toggleAutoRead">Auto-Read: OFF</button>
-        <button id="toggleAutoLike">Auto-Like: OFF</button>
-        <button id="toggleShowFloat">Show Float: ON</button>
-        <script src="popup.js"></script>
-    </body>
+<head>
+    <meta charset="UTF-8" />
+    <style>
+        body {
+            width: 320px;
+            padding: 10px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 13px;
+        }
+
+        /* Control Buttons */
+        .control-group {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+        .toggle-btn {
+            flex: 1;
+            padding: 8px 5px;
+            border: none;
+            border-radius: 4px;
+            background-color: #f0f0f0;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .toggle-btn:hover {
+            background-color: #e0e0e0;
+        }
+        .toggle-btn.active {
+            background-color: #4caf50;
+            color: white;
+        }
+
+        /* Settings Form */
+        .settings-container {
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
+        .section-title {
+            font-weight: bold;
+            margin: 10px 0 5px;
+            color: #333;
+        }
+        .form-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+        .form-group {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 2px;
+        }
+        .form-group input {
+            padding: 4px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+
+        /* Action Buttons */
+        .actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        .action-btn {
+            flex: 1;
+            padding: 6px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #2196F3;
+            color: white;
+        }
+        .action-btn.reset {
+            background-color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <!-- Main Controls -->
+    <div class="control-group">
+        <button id="toggleAutoRead" class="toggle-btn">Auto-Read</button>
+        <button id="toggleAutoLike" class="toggle-btn">Auto-Like</button>
+        <button id="toggleShowFloat" class="toggle-btn">Float</button>
+    </div>
+
+    <!-- Configuration -->
+    <div class="settings-container">
+        
+        <div class="section-title">General</div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Task Duration (min, 0=∞)</label>
+                <input type="number" id="taskDuration" min="0">
+            </div>
+            <div class="form-group">
+                <label>Refresh Delay (ms)</label>
+                <input type="number" id="pageRefreshDelay" step="1000">
+            </div>
+        </div>
+
+        <div class="section-title">Scroll Behavior</div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Step Min (px)</label>
+                <input type="number" id="scrollStepMin">
+            </div>
+            <div class="form-group">
+                <label>Step Max (px)</label>
+                <input type="number" id="scrollStepMax">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Delay Min (ms)</label>
+                <input type="number" id="scrollDelayMin">
+            </div>
+            <div class="form-group">
+                <label>Delay Max (ms)</label>
+                <input type="number" id="scrollDelayMax">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Pause Prob. (0-1)</label>
+                <input type="number" id="scrollPauseProbability" step="0.01" max="1">
+            </div>
+            <div class="form-group">
+                <label>Pause Max (ms)</label>
+                <input type="number" id="scrollPauseMax">
+            </div>
+        </div>
+
+        <div class="section-title">Like Behavior</div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Min Likes</label>
+                <input type="number" id="likeMinCount">
+            </div>
+            <div class="form-group">
+                <label>Probability (0-1)</label>
+                <input type="number" id="likeProbability" step="0.1" max="1">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Delay Min (ms)</label>
+                <input type="number" id="likeDelayMin">
+            </div>
+            <div class="form-group">
+                <label>Delay Max (ms)</label>
+                <input type="number" id="likeDelayMax">
+            </div>
+        </div>
+
+        <div class="actions">
+            <button id="saveSettings" class="action-btn">Save Settings</button>
+            <button id="resetDefaults" class="action-btn reset">Reset Defaults</button>
+        </div>
+        <div id="statusMsg" style="text-align: center; margin-top: 5px; color: green; height: 15px; font-size: 11px;"></div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
 </html>
