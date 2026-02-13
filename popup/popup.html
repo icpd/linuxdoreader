@@ -4,27 +4,35 @@
     <meta charset="UTF-8" />
     <style>
         body {
-            width: 320px;
+            width: 360px;
             padding: 10px;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             font-size: 13px;
+            margin: 0;
         }
 
         /* Control Buttons */
         .control-group {
             display: flex;
-            gap: 5px;
-            margin-bottom: 15px;
+            gap: 8px;
+            padding: 10px;
+            background: white;
+            position: sticky;
+            top: 0;
+            z-index: 102;
+            border-bottom: 1px solid #eee;
         }
         .toggle-btn {
             flex: 1;
-            padding: 8px 5px;
+            padding: 8px 2px;
             border: none;
             border-radius: 4px;
             background-color: #f0f0f0;
             cursor: pointer;
             font-weight: 500;
             transition: background-color 0.2s;
+            font-size: 12px;
+            white-space: nowrap;
         }
         .toggle-btn:hover {
             background-color: #e0e0e0;
@@ -36,53 +44,85 @@
 
         /* Settings Form */
         .settings-container {
-            border-top: 1px solid #eee;
-            padding-top: 10px;
+            padding: 0 10px 80px 10px;
         }
         .section-title {
             font-weight: bold;
-            margin: 10px 0 5px;
+            margin: 15px 0 8px;
             color: #333;
+            font-size: 12px;
+            border-left: 3px solid #2196F3;
+            padding-left: 8px;
         }
         .form-row {
             display: flex;
-            gap: 10px;
-            margin-bottom: 8px;
-            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
         }
         .form-group {
             flex: 1;
             display: flex;
             flex-direction: column;
+            min-width: 0; /* Important for flex-shrink */
         }
         .form-group label {
-            font-size: 11px;
-            color: #666;
-            margin-bottom: 2px;
+            font-size: 10px;
+            color: #777;
+            margin-bottom: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .form-group input {
             padding: 4px;
             border: 1px solid #ddd;
             border-radius: 3px;
+            font-size: 12px;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         /* Action Buttons */
         .actions {
-            margin-top: 15px;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 12px 10px;
+            background-color: white;
+            border-top: 1px solid #ddd;
             display: flex;
             gap: 10px;
+            z-index: 100;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
         }
         .action-btn {
             flex: 1;
-            padding: 6px;
+            padding: 10px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
             background-color: #2196F3;
             color: white;
+            font-weight: bold;
+            font-size: 13px;
         }
         .action-btn.reset {
             background-color: #f44336;
+        }
+        
+        #statusMsg {
+             position: fixed;
+             bottom: 65px;
+             left: 0;
+             right: 0;
+             text-align: center;
+             color: #4caf50;
+             font-size: 12px;
+             font-weight: bold;
+             pointer-events: none;
+             z-index: 101;
+             text-shadow: 0 1px 2px white;
         }
     </style>
 </head>
@@ -97,14 +137,18 @@
     <!-- Configuration -->
     <div class="settings-container">
         
-        <div class="section-title">General</div>
+        <div class="section-title">General Settings</div>
         <div class="form-row">
             <div class="form-group">
-                <label>Task Duration (min, 0=∞)</label>
+                <label title="Duration (min, 0=∞)">Duration(m)</label>
                 <input type="number" id="taskDuration" min="0">
             </div>
             <div class="form-group">
-                <label>Refresh Delay (ms)</label>
+                <label title="Navigation Delay (ms)">Nav Delay(ms)</label>
+                <input type="number" id="newOpenDelay" step="100">
+            </div>
+            <div class="form-group">
+                <label title="Page Refresh Delay (ms)">Ref Delay(ms)</label>
                 <input type="number" id="pageRefreshDelay" step="1000">
             </div>
         </div>
@@ -112,33 +156,39 @@
         <div class="section-title">Scroll Behavior</div>
         <div class="form-row">
             <div class="form-group">
-                <label>Step Min (px)</label>
+                <label>Step Min(px)</label>
                 <input type="number" id="scrollStepMin">
             </div>
             <div class="form-group">
-                <label>Step Max (px)</label>
+                <label>Step Max(px)</label>
                 <input type="number" id="scrollStepMax">
             </div>
-        </div>
-        <div class="form-row">
             <div class="form-group">
-                <label>Delay Min (ms)</label>
+                <label>Delay Min(ms)</label>
                 <input type="number" id="scrollDelayMin">
             </div>
-            <div class="form-group">
-                <label>Delay Max (ms)</label>
-                <input type="number" id="scrollDelayMax">
-            </div>
         </div>
         <div class="form-row">
             <div class="form-group">
-                <label>Pause Prob. (0-1)</label>
+                <label>Delay Max(ms)</label>
+                <input type="number" id="scrollDelayMax">
+            </div>
+            <div class="form-group">
+                <label>Pause Prob.</label>
                 <input type="number" id="scrollPauseProbability" step="0.01" max="1">
             </div>
             <div class="form-group">
-                <label>Pause Max (ms)</label>
+                <label>Pause Min(ms)</label>
+                <input type="number" id="scrollPauseMin">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Pause Max(ms)</label>
                 <input type="number" id="scrollPauseMax">
             </div>
+            <div class="form-group"></div>
+            <div class="form-group"></div>
         </div>
 
         <div class="section-title">Like Behavior</div>
@@ -148,26 +198,31 @@
                 <input type="number" id="likeMinCount">
             </div>
             <div class="form-group">
-                <label>Probability (0-1)</label>
+                <label>Prob. (0-1)</label>
                 <input type="number" id="likeProbability" step="0.1" max="1">
+            </div>
+            <div class="form-group">
+                <label>Cooldown(h)</label>
+                <input type="number" id="likeCooldownHours" step="1">
             </div>
         </div>
         <div class="form-row">
             <div class="form-group">
-                <label>Delay Min (ms)</label>
+                <label>Delay Min(ms)</label>
                 <input type="number" id="likeDelayMin">
             </div>
             <div class="form-group">
-                <label>Delay Max (ms)</label>
+                <label>Delay Max(ms)</label>
                 <input type="number" id="likeDelayMax">
             </div>
+            <div class="form-group"></div>
         </div>
 
         <div class="actions">
             <button id="saveSettings" class="action-btn">Save Settings</button>
             <button id="resetDefaults" class="action-btn reset">Reset Defaults</button>
         </div>
-        <div id="statusMsg" style="text-align: center; margin-top: 5px; color: green; height: 15px; font-size: 11px;"></div>
+        <div id="statusMsg"></div>
     </div>
 
     <script src="popup.js"></script>

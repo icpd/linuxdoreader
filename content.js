@@ -38,7 +38,7 @@ const SELECTORS = {
   POST_ID_PREFIX: "#post_",
   LIKE_BUTTON: ".discourse-reactions-reaction-button",
   LIKE_COUNTER: ".reactions-counter",
-  TOPIC_LINKS: "a[data-topic-id]",
+  TOPIC_LINKS: "a[data-topic-id].title",
 };
 
 // --- 2. 存储工具函数 ---
@@ -314,8 +314,8 @@ function startAutoScroll() {
 
     // 2. 触底判断
     if (window.scrollY + window.innerHeight + 5 >= document.body.scrollHeight) {
-      // 智能等待：给予页面懒加载的时间
-      await new Promise((r) => setTimeout(r, 2000));
+      // 智能等待：给予页面懒加载的时间，至少3秒或根据延迟动态调整
+      await new Promise((r) => setTimeout(r, 3000));
 
       // 再次检查是否真的到底（如果在等待期间加载了新内容，高度会增加）
       if (

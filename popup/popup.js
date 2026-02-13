@@ -55,17 +55,49 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // 2. Initialize Config Inputs
-  loadConfigToInputs(state.config || DEFAULT_CONFIG);
+  // Fallback to DEFAULT_CONFIG if state.config is empty or missing
+  const currentConfig = state.config || DEFAULT_CONFIG;
+  loadConfigToInputs(currentConfig);
 
   // 3. Save Settings Handler
   document.getElementById("saveSettings").addEventListener("click", async () => {
-    const newConfig = {};
+    // Read current config first to avoid overwriting hidden keys
+    const currentStored = await storage.get("config");
+    const baseConfig = currentStored.config || DEFAULT_CONFIG;
+
+    // Clone base config
+    const newConfig = { ...baseConfig };
+
     CONFIG_KEYS.forEach(key => {
       const input = document.getElementById(key);
       if (input) {
         // Convert to number for all inputs as they are numeric
         const val = parseFloat(input.value);
         newConfig[key] = isNaN(val) ? DEFAULT_CONFIG[key] : val;
+      }
+    });
+
+    // Auto-correct Min > Max
+    const pairs = [
+      ['scrollStepMin', 'scrollStepMax'],
+      ['scrollDelayMin', 'scrollDelayMax'],
+      ['scrollPauseMin', 'scrollPauseMax'],
+      ['likeDelayMin', 'likeDelayMax']
+    ];
+
+    pairs.forEach(([minKey, maxKey]) => {
+      if (newConfig[minKey] !== undefined && newConfig[maxKey] !== undefined) {
+        if (newConfig[minKey] > newConfig[maxKey]) {
+          // Swap values
+          [newConfig[minKey], newConfig[maxKey]] = [newConfig[maxKey], newConfig[minKey]];
+          // Update UI
+          const minInput = document.getElementById(minKey);
+          const maxInput = document.getElementById(maxKey);
+          if (minInput && maxInput) {
+            minInput.value = newConfig[minKey];
+            maxInput.value = newConfig[maxKey];
+          }
+        }
       }
     });
 
@@ -84,7 +116,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function updateToggleUI(button, label, isActive) {
-  button.textContent = isActive ? `${label}: ON` : label;
+  // Update text to show ON/OFF explicitly
+  button.textContent = `${label}: ${isActive ? "ON" : "OFF"}`;
   button.classList.toggle("active", isActive);
 }
 
