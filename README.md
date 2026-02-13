@@ -1,4 +1,4 @@
-# LinuxDoReader (v1.3.0)
+# LinuxDoReader
 
 一款专为 `linux.do` 论坛设计的 Chrome 浏览器扩展。通过模拟拟人化的阅读与智能点赞逻辑，帮助用户自动浏览帖子，保持论坛活跃。
 
