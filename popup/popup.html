@@ -3,227 +3,589 @@
 <head>
     <meta charset="UTF-8" />
     <style>
+        :root {
+            color-scheme: light;
+            --canvas: oklch(0.965 0.006 235);
+            --surface: oklch(0.995 0.002 235);
+            --surface-muted: oklch(0.94 0.007 235);
+            --text: oklch(0.22 0.015 235);
+            --muted: oklch(0.52 0.018 235);
+            --line: oklch(0.88 0.008 235);
+            --accent: oklch(0.58 0.12 160);
+            --accent-strong: oklch(0.48 0.12 160);
+            --danger: oklch(0.56 0.16 28);
+            --radius-sm: 6px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --shadow: 0 1px 2px rgba(22, 31, 44, 0.08), 0 8px 24px rgba(22, 31, 44, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            width: 360px;
-            padding: 10px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            font-size: 13px;
+            width: 380px;
             margin: 0;
+            background: var(--canvas);
+            color: var(--text);
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 13px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
-        /* Control Buttons */
-        .control-group {
-            display: flex;
-            gap: 8px;
-            padding: 10px;
-            background: white;
-            position: sticky;
-            top: 0;
-            z-index: 102;
-            border-bottom: 1px solid #eee;
-        }
-        .toggle-btn {
-            flex: 1;
-            padding: 8px 2px;
-            border: none;
-            border-radius: 4px;
-            background-color: #f0f0f0;
-            cursor: pointer;
-            font-weight: 500;
-            transition: background-color 0.2s;
-            font-size: 12px;
-            white-space: nowrap;
-        }
-        .toggle-btn:hover {
-            background-color: #e0e0e0;
-        }
-        .toggle-btn.active {
-            background-color: #4caf50;
-            color: white;
+        button,
+        input,
+        summary {
+            font: inherit;
         }
 
-        /* Settings Form */
-        .settings-container {
-            padding: 0 10px 80px 10px;
+        button {
+            touch-action: manipulation;
         }
-        .section-title {
-            font-weight: bold;
-            margin: 15px 0 8px;
-            color: #333;
-            font-size: 12px;
-            border-left: 3px solid #2196F3;
-            padding-left: 8px;
+
+        .app {
+            padding: 12px;
         }
-        .form-row {
+
+        .status-panel {
+            padding: 14px;
+            border-radius: var(--radius-lg);
+            background: var(--surface);
+            box-shadow: var(--shadow);
+        }
+
+        .brand-row {
             display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .eyebrow {
+            margin: 0 0 3px;
+            color: var(--muted);
+            font-size: 11px;
+            line-height: 1.2;
+        }
+
+        .title {
+            margin: 0;
+            font-size: 18px;
+            line-height: 1.2;
+            letter-spacing: -0.012em;
+        }
+
+        .status-pill {
+            min-width: 74px;
+            padding: 5px 8px;
+            border-radius: 999px;
+            background: var(--surface-muted);
+            color: var(--muted);
+            text-align: center;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1.2;
+            text-transform: uppercase;
+        }
+
+        .status-pill.active {
+            background: oklch(0.91 0.06 160);
+            color: var(--accent-strong);
+        }
+
+        .runtime-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 8px;
-            margin-bottom: 10px;
+            margin-top: 14px;
         }
-        .form-group {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            min-width: 0; /* Important for flex-shrink */
+
+        .metric {
+            min-height: 54px;
+            padding: 9px 10px;
+            border-radius: var(--radius-md);
+            background: var(--surface-muted);
         }
-        .form-group label {
+
+        .metric-label {
+            color: var(--muted);
             font-size: 10px;
-            color: #777;
-            margin-bottom: 3px;
+            line-height: 1.2;
+        }
+
+        .metric-value {
+            margin-top: 5px;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.2;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .toggle-btn {
+            min-height: 48px;
+            padding: 8px;
+            border: 0;
+            border-radius: var(--radius-md);
+            background: var(--surface);
+            color: var(--text);
+            box-shadow: inset 0 0 0 1px var(--line);
+            cursor: pointer;
+            transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1), background-color 140ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 140ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .toggle-btn:active {
+            transform: scale(0.97);
+        }
+
+        .toggle-btn.active {
+            background: oklch(0.9 0.065 160);
+            color: var(--accent-strong);
+            box-shadow: inset 0 0 0 1px oklch(0.74 0.08 160);
+        }
+
+        .toggle-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .toggle-state {
+            display: block;
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: 10px;
+            line-height: 1.2;
+            text-transform: uppercase;
+        }
+
+        .toggle-btn.active .toggle-state {
+            color: var(--accent-strong);
+        }
+
+        .profile-card {
+            margin-top: 12px;
+            padding: 11px 12px;
+            border-radius: var(--radius-md);
+            background: oklch(0.955 0.012 160);
+            box-shadow: inset 0 0 0 1px oklch(0.84 0.035 160);
+        }
+
+        .profile-heading,
+        .profile-main,
+        .profile-stats {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .profile-heading {
+            color: var(--accent-strong);
+            font-size: 10px;
+            font-weight: 800;
+            line-height: 1.2;
+            text-transform: uppercase;
+        }
+
+        .profile-badge {
+            padding: 3px 6px;
+            border-radius: 999px;
+            background: oklch(0.91 0.045 160);
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        .profile-main {
+            margin-top: 8px;
+            align-items: flex-end;
+        }
+
+        .profile-mode {
+            font-size: 16px;
+            font-weight: 800;
+            line-height: 1.2;
+            letter-spacing: -0.012em;
+        }
+
+        .profile-meta {
+            margin-top: 3px;
+            color: oklch(0.42 0.04 160);
+            font-size: 11px;
+            line-height: 1.3;
+        }
+
+        .profile-progress-value {
+            color: var(--accent-strong);
+            font-size: 18px;
+            font-weight: 800;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .profile-bar {
+            height: 6px;
+            margin-top: 10px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: oklch(0.86 0.03 160);
+        }
+
+        .profile-bar-fill {
+            display: block;
+            width: 0%;
+            height: 100%;
+            border-radius: inherit;
+            background: var(--accent-strong);
+            transition: width 180ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .profile-stats {
+            margin-top: 10px;
+        }
+
+        .profile-stat {
+            min-width: 0;
+        }
+
+        .profile-stat-label {
+            color: oklch(0.5 0.035 160);
+            font-size: 10px;
+            line-height: 1.2;
+        }
+
+        .profile-stat-value {
+            margin-top: 2px;
+            font-size: 12px;
+            font-weight: 750;
+            line-height: 1.2;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .settings-container {
+            display: grid;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        details {
+            border-radius: var(--radius-lg);
+            background: var(--surface);
+            box-shadow: inset 0 0 0 1px var(--line);
+            overflow: hidden;
+        }
+
+        details[open] {
+            box-shadow: var(--shadow);
+        }
+
+        summary {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 42px;
+            padding: 0 12px;
+            cursor: pointer;
+            list-style: none;
+            font-weight: 750;
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::after {
+            content: "+";
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        details[open] summary::after {
+            content: "-";
+        }
+
+        .section-body {
+            padding: 0 12px 12px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .form-row.two {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .form-group {
+            min-width: 0;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+            color: var(--muted);
+            font-size: 10px;
+            line-height: 1.2;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
+
         .form-group input {
-            padding: 4px;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-            font-size: 12px;
             width: 100%;
-            box-sizing: border-box;
+            height: 32px;
+            padding: 0 8px;
+            border: 0;
+            border-radius: var(--radius-sm);
+            background: var(--surface-muted);
+            color: var(--text);
+            box-shadow: inset 0 0 0 1px var(--line);
+            font-size: 12px;
+            font-variant-numeric: tabular-nums;
         }
 
-        /* Action Buttons */
+        .form-group input:focus-visible,
+        .toggle-btn:focus-visible,
+        .action-btn:focus-visible {
+            outline: 2px solid oklch(0.72 0.1 160);
+            outline-offset: 2px;
+        }
+
         .actions {
-            position: fixed;
+            position: sticky;
             bottom: 0;
-            left: 0;
-            right: 0;
-            padding: 12px 10px;
-            background-color: white;
-            border-top: 1px solid #ddd;
             display: flex;
-            gap: 10px;
-            z-index: 100;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+            gap: 8px;
+            margin: 12px -12px -12px;
+            padding: 10px 12px 12px;
+            background: color-mix(in oklch, var(--canvas) 92%, white);
+            box-shadow: 0 -1px 0 var(--line);
         }
+
         .action-btn {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 4px;
+            min-height: 42px;
+            padding: 0 12px;
+            border: 0;
+            border-radius: var(--radius-md);
             cursor: pointer;
-            background-color: #2196F3;
+            font-weight: 750;
+            transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1), background-color 140ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .action-btn:active {
+            transform: scale(0.98);
+        }
+
+        .action-btn.primary {
+            flex: 1;
+            background: var(--text);
             color: white;
-            font-weight: bold;
-            font-size: 13px;
         }
+
         .action-btn.reset {
-            background-color: #f44336;
+            width: 96px;
+            background: transparent;
+            color: var(--danger);
+            box-shadow: inset 0 0 0 1px oklch(0.86 0.04 28);
         }
-        
+
         #statusMsg {
-             position: fixed;
-             bottom: 65px;
-             left: 0;
-             right: 0;
-             text-align: center;
-             color: #4caf50;
-             font-size: 12px;
-             font-weight: bold;
-             pointer-events: none;
-             z-index: 101;
-             text-shadow: 0 1px 2px white;
+            min-height: 18px;
+            margin-top: 10px;
+            color: var(--accent-strong);
+            font-size: 12px;
+            font-weight: 700;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .toggle-btn,
+            .action-btn {
+                transition: none;
+            }
         }
     </style>
 </head>
 <body>
-    <!-- Main Controls -->
-    <div class="control-group">
-        <button id="toggleAutoRead" class="toggle-btn">Auto-Read</button>
-        <button id="toggleAutoLike" class="toggle-btn">Auto-Like</button>
-        <button id="toggleShowFloat" class="toggle-btn">Float</button>
-    </div>
+    <main class="app">
+        <section class="status-panel" aria-label="Runtime status">
+            <div class="brand-row">
+                <div>
+                    <p class="eyebrow">linux.do reader</p>
+                    <h1 class="title">Reading control</h1>
+                </div>
+                <div id="taskStatus" class="status-pill">Idle</div>
+            </div>
 
-    <!-- Configuration -->
-    <div class="settings-container">
-        
-        <div class="section-title">General Settings</div>
-        <div class="form-row">
-            <div class="form-group">
-                <label title="Duration (min, 0=∞)">Duration(m)</label>
-                <input type="number" id="taskDuration" min="0">
+            <div class="runtime-grid">
+                <div class="metric">
+                    <div class="metric-label">Remaining</div>
+                    <div id="taskRemaining" class="metric-value">No limit</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Mode</div>
+                    <div id="taskMode" class="metric-value">Manual</div>
+                </div>
             </div>
-            <div class="form-group">
-                <label title="Navigation Delay (ms)">Nav Delay(ms)</label>
-                <input type="number" id="newOpenDelay" step="100">
-            </div>
-            <div class="form-group">
-                <label title="Page Refresh Delay (ms)">Ref Delay(ms)</label>
-                <input type="number" id="pageRefreshDelay" step="1000">
-            </div>
-        </div>
 
-        <div class="section-title">Scroll Behavior</div>
-        <div class="form-row">
-            <div class="form-group">
-                <label>Step Min(px)</label>
-                <input type="number" id="scrollStepMin">
+            <div class="controls">
+                <button id="toggleAutoRead" class="toggle-btn" type="button">
+                    <span class="toggle-label">Read</span>
+                    <span class="toggle-state">Off</span>
+                </button>
+                <button id="toggleAutoLike" class="toggle-btn" type="button">
+                    <span class="toggle-label">Like</span>
+                    <span class="toggle-state">Off</span>
+                </button>
+                <button id="toggleShowFloat" class="toggle-btn" type="button">
+                    <span class="toggle-label">Panel</span>
+                    <span class="toggle-state">On</span>
+                </button>
             </div>
-            <div class="form-group">
-                <label>Step Max(px)</label>
-                <input type="number" id="scrollStepMax">
-            </div>
-            <div class="form-group">
-                <label>Delay Min(ms)</label>
-                <input type="number" id="scrollDelayMin">
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label>Delay Max(ms)</label>
-                <input type="number" id="scrollDelayMax">
-            </div>
-            <div class="form-group">
-                <label>Pause Prob.</label>
-                <input type="number" id="scrollPauseProbability" step="0.01" max="1">
-            </div>
-            <div class="form-group">
-                <label>Pause Min(ms)</label>
-                <input type="number" id="scrollPauseMin">
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label>Pause Max(ms)</label>
-                <input type="number" id="scrollPauseMax">
-            </div>
-            <div class="form-group"></div>
-            <div class="form-group"></div>
-        </div>
 
-        <div class="section-title">Like Behavior</div>
-        <div class="form-row">
-            <div class="form-group">
-                <label>Min Likes</label>
-                <input type="number" id="likeMinCount">
+            <div class="profile-card" aria-label="Reading preference profile">
+                <div class="profile-heading">
+                    <span>Read profile</span>
+                    <span id="readProfileState" class="profile-badge">Model</span>
+                </div>
+                <div class="profile-main">
+                    <div>
+                        <div id="readProfileMode" class="profile-mode">Weighted mix</div>
+                        <div id="readProfileMeta" class="profile-meta">Skim 28% / Normal 52% / Deep 20%</div>
+                    </div>
+                    <div id="readProfileProgressText" class="profile-progress-value">0%</div>
+                </div>
+                <div class="profile-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <span id="readProfileProgress" class="profile-bar-fill"></span>
+                </div>
+                <div class="profile-stats">
+                    <div class="profile-stat">
+                        <div class="profile-stat-label">Target</div>
+                        <div id="readProfileTarget" class="profile-stat-value">12-100%</div>
+                    </div>
+                    <div class="profile-stat">
+                        <div class="profile-stat-label">Stay</div>
+                        <div id="readProfileStay" class="profile-stat-value">12s-7m</div>
+                    </div>
+                    <div class="profile-stat">
+                        <div class="profile-stat-label">Exit</div>
+                        <div id="readProfileExit" class="profile-stat-value">Random</div>
+                    </div>
+                </div>
             </div>
-            <div class="form-group">
-                <label>Prob. (0-1)</label>
-                <input type="number" id="likeProbability" step="0.1" max="1">
-            </div>
-            <div class="form-group">
-                <label>Cooldown(h)</label>
-                <input type="number" id="likeCooldownHours" step="1">
-            </div>
-        </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label>Delay Min(ms)</label>
-                <input type="number" id="likeDelayMin">
-            </div>
-            <div class="form-group">
-                <label>Delay Max(ms)</label>
-                <input type="number" id="likeDelayMax">
-            </div>
-            <div class="form-group"></div>
-        </div>
+        </section>
+
+        <section class="settings-container" aria-label="Settings">
+            <details open>
+                <summary>Session</summary>
+                <div class="section-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label title="Duration (min, 0=unlimited)">Duration m</label>
+                            <input type="number" id="taskDuration" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label title="Navigation delay in milliseconds">Nav delay</label>
+                            <input type="number" id="newOpenDelay" step="100">
+                        </div>
+                        <div class="form-group">
+                            <label title="Refresh delay in milliseconds">Refresh</label>
+                            <input type="number" id="pageRefreshDelay" step="1000">
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <details>
+                <summary>Reading pace</summary>
+                <div class="section-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Step min</label>
+                            <input type="number" id="scrollStepMin">
+                        </div>
+                        <div class="form-group">
+                            <label>Step max</label>
+                            <input type="number" id="scrollStepMax">
+                        </div>
+                        <div class="form-group">
+                            <label>Pause prob.</label>
+                            <input type="number" id="scrollPauseProbability" step="0.01" max="1">
+                        </div>
+                    </div>
+                    <div class="form-row two">
+                        <div class="form-group">
+                            <label>Delay min</label>
+                            <input type="number" id="scrollDelayMin">
+                        </div>
+                        <div class="form-group">
+                            <label>Delay max</label>
+                            <input type="number" id="scrollDelayMax">
+                        </div>
+                    </div>
+                    <div class="form-row two">
+                        <div class="form-group">
+                            <label>Pause min</label>
+                            <input type="number" id="scrollPauseMin">
+                        </div>
+                        <div class="form-group">
+                            <label>Pause max</label>
+                            <input type="number" id="scrollPauseMax">
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <details>
+                <summary>Like strategy</summary>
+                <div class="section-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Min likes</label>
+                            <input type="number" id="likeMinCount">
+                        </div>
+                        <div class="form-group">
+                            <label>Probability</label>
+                            <input type="number" id="likeProbability" step="0.1" max="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Cooldown h</label>
+                            <input type="number" id="likeCooldownHours" step="1">
+                        </div>
+                    </div>
+                    <div class="form-row two">
+                        <div class="form-group">
+                            <label>Delay min</label>
+                            <input type="number" id="likeDelayMin">
+                        </div>
+                        <div class="form-group">
+                            <label>Delay max</label>
+                            <input type="number" id="likeDelayMax">
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </section>
 
         <div class="actions">
-            <button id="saveSettings" class="action-btn">Save Settings</button>
-            <button id="resetDefaults" class="action-btn reset">Reset Defaults</button>
+            <button id="saveSettings" class="action-btn primary" type="button">Save settings</button>
+            <button id="resetDefaults" class="action-btn reset" type="button">Reset</button>
         </div>
         <div id="statusMsg"></div>
-    </div>
+    </main>
 
     <script src="popup.js"></script>
 </body>

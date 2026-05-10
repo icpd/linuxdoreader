@@ -35,6 +35,24 @@ const LEGACY_DEFAULT_CONFIG = {
   likeDelayMax: 15000,
 };
 
+const READ_PROFILE_MODEL = [
+  { key: "skim", label: "Skim", weight: 0.28 },
+  { key: "normal", label: "Normal", weight: 0.52 },
+  { key: "deep", label: "Deep", weight: 0.2 },
+];
+
+const READ_PROFILE_LABELS = {
+  skim: "Skim",
+  normal: "Normal",
+  deep: "Deep",
+};
+
+const TOGGLE_CONFIGS = [
+  { id: "toggleAutoRead", key: "autoread", label: "Auto-Read" },
+  { id: "toggleAutoLike", key: "autolike", label: "Auto-Like" },
+  { id: "toggleShowFloat", key: "showfloat", label: "Panel" },
+];
+
 // Map of config keys to input IDs
 const CONFIG_KEYS = Object.keys(DEFAULT_CONFIG);
 
@@ -73,25 +91,28 @@ function getTaskTimingUpdates(config = DEFAULT_CONFIG, startTime = Date.now()) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   // 1. Initialize Toggle Buttons
-  const toggles = [
-    { id: "toggleAutoRead", key: "autoread", label: "Auto-Read" },
-    { id: "toggleAutoLike", key: "autolike", label: "Auto-Like" },
-    { id: "toggleShowFloat", key: "showfloat", label: "Float" },
-  ];
-
-  const state = await storage.get([...toggles.map((c) => c.key), "config"]);
+  const state = await storage.get([
+    ...TOGGLE_CONFIGS.map((c) => c.key),
+    "config",
+  ]);
   const migration = migrateStoredConfig(state.config);
   if (migration.changed) {
     await storage.set({ config: migration.config });
   }
   
-  toggles.forEach((item) => {
+  TOGGLE_CONFIGS.forEach((item) => {
     const btn = document.getElementById(item.id);
-    updateToggleUI(btn, item.label, state[item.key]);
+    const initialState =
+      state[item.key] === undefined ? item.key === "showfloat" : state[item.key];
+    updateToggleUI(btn, item.label, initialState);
 
     btn.addEventListener("click", async () => {
       const currentState = await storage.get([item.key]);
-      const newState = !currentState[item.key];
+      const oldState =
+        currentState[item.key] === undefined
+          ? item.key === "showfloat"
+          : currentState[item.key];
+      const newState = !oldState;
       
       const updates = { [item.key]: newState };
       
@@ -106,6 +127,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       await storage.set(updates);
       updateToggleUI(btn, item.label, newState);
+      await renderRuntimeStatus();
     });
   });
 
@@ -164,7 +186,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     await storage.set(configUpdates);
-    showStatus("Settings saved!");
+    await renderRuntimeStatus();
+    showStatus("Settings saved");
   });
 
   // 4. Reset Defaults Handler
@@ -172,15 +195,41 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (confirm("Reset all settings to default?")) {
       await storage.set({ config: DEFAULT_CONFIG });
       loadConfigToInputs(DEFAULT_CONFIG);
-      showStatus("Reset to defaults.");
+      await renderRuntimeStatus();
+      showStatus("Reset to defaults");
     }
+  });
+
+  await renderRuntimeStatus();
+  setInterval(renderRuntimeStatus, 1000);
+  chrome.storage.onChanged.addListener(() => {
+    renderRuntimeStatus();
   });
 });
 
 function updateToggleUI(button, label, isActive) {
-  // Update text to show ON/OFF explicitly
-  button.textContent = `${label}: ${isActive ? "ON" : "OFF"}`;
+  const labelEl = button.querySelector(".toggle-label");
+  const stateEl = button.querySelector(".toggle-state");
+
+  if (labelEl && stateEl) {
+    labelEl.textContent = label.replace("Auto-", "");
+    stateEl.textContent = isActive ? "On" : "Off";
+  } else {
+    button.textContent = `${label}: ${isActive ? "ON" : "OFF"}`;
+  }
   button.classList.toggle("active", isActive);
+  button.setAttribute("aria-pressed", String(Boolean(isActive)));
+}
+
+function syncToggleButtons(state) {
+  TOGGLE_CONFIGS.forEach((item) => {
+    const btn = document.getElementById(item.id);
+    if (!btn) return;
+
+    const isActive =
+      state[item.key] === undefined ? item.key === "showfloat" : state[item.key];
+    updateToggleUI(btn, item.label, isActive);
+  });
 }
 
 function loadConfigToInputs(config) {
@@ -196,4 +245,130 @@ function showStatus(msg) {
   const el = document.getElementById("statusMsg");
   el.textContent = msg;
   setTimeout(() => el.textContent = "", 2000);
+}
+
+async function renderRuntimeStatus() {
+  const state = await storage.get([
+    "autoread",
+    "autolike",
+    "showfloat",
+    "taskDeadlineTime",
+    "readSession",
+    "config",
+  ]);
+
+  const taskStatus = document.getElementById("taskStatus");
+  const taskRemaining = document.getElementById("taskRemaining");
+  const taskMode = document.getElementById("taskMode");
+  if (!taskStatus || !taskRemaining || !taskMode) return;
+
+  syncToggleButtons(state);
+
+  const isRunning = Boolean(state.autoread || state.autolike);
+  taskStatus.textContent = isRunning ? "Active" : "Idle";
+  taskStatus.classList.toggle("active", isRunning);
+
+  const activeModes = [];
+  if (state.autoread) activeModes.push("Read");
+  if (state.autolike) activeModes.push("Like");
+  taskMode.textContent = activeModes.length ? activeModes.join(" + ") : "Manual";
+
+  const duration = Number(state.config?.taskDuration || 0);
+  const deadline = Number(state.taskDeadlineTime || 0);
+  if (!isRunning) {
+    taskRemaining.textContent = "Stopped";
+  } else if (duration <= 0 || deadline <= 0) {
+    taskRemaining.textContent = "No limit";
+  } else {
+    const remainingMs = Math.max(0, deadline - Date.now());
+    taskRemaining.textContent = formatRemaining(remainingMs);
+  }
+
+  renderReadProfile(state.readSession, state.autoread);
+}
+
+function formatRemaining(ms) {
+  const totalSeconds = Math.ceil(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function renderReadProfile(session, isAutoRead) {
+  const stateEl = document.getElementById("readProfileState");
+  const modeEl = document.getElementById("readProfileMode");
+  const metaEl = document.getElementById("readProfileMeta");
+  const progressTextEl = document.getElementById("readProfileProgressText");
+  const progressEl = document.getElementById("readProfileProgress");
+  const progressBarEl = progressEl?.parentElement;
+  const targetEl = document.getElementById("readProfileTarget");
+  const stayEl = document.getElementById("readProfileStay");
+  const exitEl = document.getElementById("readProfileExit");
+  if (
+    !stateEl ||
+    !modeEl ||
+    !metaEl ||
+    !progressTextEl ||
+    !progressEl ||
+    !progressBarEl ||
+    !targetEl ||
+    !stayEl ||
+    !exitEl
+  ) {
+    return;
+  }
+
+  const isFresh =
+    session?.updatedAt && Date.now() - Number(session.updatedAt) < 5 * 60 * 1000;
+  if (!isAutoRead || !session || !isFresh) {
+    const mix = READ_PROFILE_MODEL
+      .map((item) => `${item.label} ${Math.round(item.weight * 100)}%`)
+      .join(" / ");
+    stateEl.textContent = "Model";
+    modeEl.textContent = "Weighted mix";
+    metaEl.textContent = mix;
+    progressTextEl.textContent = "0%";
+    progressEl.style.width = "0%";
+    progressBarEl.setAttribute("aria-valuenow", "0");
+    targetEl.textContent = "12-100%";
+    stayEl.textContent = "12s-7m";
+    exitEl.textContent = "Random";
+    return;
+  }
+
+  const progress = clamp(Number(session.progress) || 0, 0, 1);
+  const progressPercent = Math.round(progress * 100);
+  const targetPercent = Math.round(
+    clamp(Number(session.targetProgress) || 0, 0, 1) * 100,
+  );
+  const elapsed = Math.max(
+    0,
+    Date.now() - Number(session.startedAt || Date.now()),
+  );
+
+  stateEl.textContent = session.isLeaving ? "Leaving" : "Live";
+  modeEl.textContent = READ_PROFILE_LABELS[session.mode] || "Custom";
+  metaEl.textContent = `Elapsed ${formatDurationCompact(elapsed)}`;
+  progressTextEl.textContent = `${progressPercent}%`;
+  progressEl.style.width = `${progressPercent}%`;
+  progressBarEl.setAttribute("aria-valuenow", String(progressPercent));
+  targetEl.textContent = `${targetPercent}%`;
+  stayEl.textContent = `${formatDurationCompact(session.minReadMs)}-${formatDurationCompact(
+    session.maxReadMs,
+  )}`;
+  exitEl.textContent = session.reviewBeforeExit ? "Review" : "Direct";
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function formatDurationCompact(ms) {
+  const totalSeconds = Math.max(0, Math.round(Number(ms || 0) / 1000));
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (seconds === 0) return `${minutes}m`;
+  return `${minutes}m${String(seconds).padStart(2, "0")}`;
 }

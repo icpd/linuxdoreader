@@ -460,6 +460,29 @@ const READ_SESSION_MODES = [
   },
 ];
 
+function formatReadSessionSnapshot() {
+  if (!readSession) return null;
+
+  return {
+    mode: readSession.mode,
+    startedAt: readSession.startedAt,
+    targetProgress: readSession.targetProgress,
+    minReadMs: readSession.minReadMs,
+    maxReadMs: readSession.maxReadMs,
+    exitPauseMs: readSession.exitPauseMs,
+    reviewBeforeExit: readSession.reviewBeforeExit,
+    isLeaving: readSession.isLeaving,
+    progress: getReadProgress(),
+    updatedAt: Date.now(),
+  };
+}
+
+function publishReadSession() {
+  storage.set("readSession", formatReadSessionSnapshot()).catch((error) => {
+    console.warn("[LinuxDoReader] Failed to publish read session:", error);
+  });
+}
+
 function pickWeightedMode(modes) {
   const totalWeight = modes.reduce((sum, mode) => sum + mode.weight, 0);
   let cursor = Math.random() * totalWeight;
@@ -533,6 +556,7 @@ function shouldLeaveTopicByBudget() {
 function scheduleTopicExit() {
   if (!readSession || readSession.isLeaving) return;
   readSession.isLeaving = true;
+  publishReadSession();
   isScrolling = false;
   clearPendingScroll();
 
@@ -562,6 +586,7 @@ function clearAutoReadState() {
   clearPendingNavigation();
   clearPendingScroll();
   readSession = null;
+  publishReadSession();
   isScrolling = false;
 }
 
@@ -608,6 +633,7 @@ function startAutoScroll() {
   isScrolling = true;
   if (!readSession) {
     readSession = createReadSession();
+    publishReadSession();
   }
 
   const runScroll = async () => {
@@ -625,11 +651,13 @@ function startAutoScroll() {
     if (!isAutoRead || !isTopicPage) {
       isScrolling = false;
       readSession = null;
+      publishReadSession();
       if (isAutoRead) handleNavigation();
       return;
     }
 
     markVisiblePostsAsRead();
+    publishReadSession();
     if (shouldLeaveTopicByBudget()) {
       scheduleTopicExit();
       return;
@@ -649,6 +677,7 @@ function startAutoScroll() {
         isScrolling = false;
         if (readSession) {
           readSession.isLeaving = true;
+          publishReadSession();
         }
         scheduleAutoReadNavigation(() => {
           location.href = CONSTANTS.URLS.HOME;
@@ -737,6 +766,7 @@ async function handleNavigation() {
     return;
   }
   readSession = null;
+  publishReadSession();
 
   // 2. 如果在首页或列表页
   if (isTopicListPage(currentUrl)) {
