@@ -5,8 +5,25 @@ const storage = {
 
 const DEFAULT_CONFIG = {
   taskDuration: 0,
-  newOpenDelay: 3000,
+  newOpenDelay: 5000,
   pageRefreshDelay: 60000,
+  scrollStepMin: 320,
+  scrollStepMax: 900,
+  scrollDelayMin: 800,
+  scrollDelayMax: 2600,
+  scrollPauseProbability: 0.22,
+  scrollPauseMin: 3500,
+  scrollPauseMax: 12000,
+  likeMinCount: 5,
+  likeProbability: 0.8,
+  likeDelayMin: 15000,
+  likeDelayMax: 45000,
+  likeCooldownHours: 24
+};
+
+const CONFIG_SCHEMA_VERSION = 2;
+const LEGACY_DEFAULT_CONFIG = {
+  newOpenDelay: 3000,
   scrollStepMin: 10,
   scrollStepMax: 30,
   scrollDelayMin: 50,
@@ -14,15 +31,45 @@ const DEFAULT_CONFIG = {
   scrollPauseProbability: 0.05,
   scrollPauseMin: 1000,
   scrollPauseMax: 3000,
-  likeMinCount: 5,
-  likeProbability: 0.8,
   likeDelayMin: 5000,
   likeDelayMax: 15000,
-  likeCooldownHours: 24
 };
 
 // Map of config keys to input IDs
 const CONFIG_KEYS = Object.keys(DEFAULT_CONFIG);
+
+function migrateStoredConfig(storedConfig) {
+  if (!storedConfig || storedConfig.__schemaVersion >= CONFIG_SCHEMA_VERSION) {
+    return { config: storedConfig, changed: false };
+  }
+
+  const migrated = {
+    ...DEFAULT_CONFIG,
+    ...storedConfig,
+    __schemaVersion: CONFIG_SCHEMA_VERSION,
+  };
+  Object.entries(LEGACY_DEFAULT_CONFIG).forEach(([key, legacyValue]) => {
+    if (migrated[key] === legacyValue) {
+      migrated[key] = DEFAULT_CONFIG[key];
+    }
+  });
+
+  return { config: migrated, changed: true };
+}
+
+function getTaskDurationMs(config = DEFAULT_CONFIG) {
+  const durationMinutes = Number(config?.taskDuration ?? DEFAULT_CONFIG.taskDuration);
+  if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return 0;
+  return durationMinutes * 60 * 1000;
+}
+
+function getTaskTimingUpdates(config = DEFAULT_CONFIG, startTime = Date.now()) {
+  const durationMs = getTaskDurationMs(config);
+  return {
+    taskStartTime: startTime,
+    taskDeadlineTime: durationMs > 0 ? startTime + durationMs : 0,
+  };
+}
 
 document.addEventListener("DOMContentLoaded", async () => {
   // 1. Initialize Toggle Buttons
@@ -33,6 +80,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   ];
 
   const state = await storage.get([...toggles.map((c) => c.key), "config"]);
+  const migration = migrateStoredConfig(state.config);
+  if (migration.changed) {
+    await storage.set({ config: migration.config });
+  }
   
   toggles.forEach((item) => {
     const btn = document.getElementById(item.id);
@@ -46,7 +97,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       
       // If turning ON any automation task, reset the task start time
       if (newState && (item.key === 'autoread' || item.key === 'autolike')) {
-        updates.taskStartTime = Date.now();
+        const currentConfig = await storage.get("config");
+        Object.assign(
+          updates,
+          getTaskTimingUpdates(currentConfig.config || DEFAULT_CONFIG),
+        );
       }
 
       await storage.set(updates);
@@ -56,7 +111,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // 2. Initialize Config Inputs
   // Fallback to DEFAULT_CONFIG if state.config is empty or missing
-  const currentConfig = state.config || DEFAULT_CONFIG;
+  const currentConfig = migration.config || DEFAULT_CONFIG;
   loadConfigToInputs(currentConfig);
 
   // 3. Save Settings Handler
@@ -101,7 +156,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
 
-    await storage.set({ config: newConfig });
+    const taskState = await storage.get(["autoread", "autolike", "taskStartTime"]);
+    const configUpdates = { config: newConfig };
+    if (taskState.autoread || taskState.autolike) {
+      const startTime = taskState.taskStartTime || Date.now();
+      Object.assign(configUpdates, getTaskTimingUpdates(newConfig, startTime));
+    }
+
+    await storage.set(configUpdates);
     showStatus("Settings saved!");
   });
 

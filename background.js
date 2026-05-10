@@ -5,23 +5,23 @@ const DEFAULT_CONFIG = {
   taskDuration: 0, // 0 means infinite (minutes)
 
   // Navigation / Delays
-  newOpenDelay: 3000,
+  newOpenDelay: 5000,
   pageRefreshDelay: 60000,
 
   // Scroll Settings
-  scrollStepMin: 10,
-  scrollStepMax: 30,
-  scrollDelayMin: 50,
-  scrollDelayMax: 150,
-  scrollPauseProbability: 0.05,
-  scrollPauseMin: 1000,
-  scrollPauseMax: 3000,
+  scrollStepMin: 320,
+  scrollStepMax: 900,
+  scrollDelayMin: 800,
+  scrollDelayMax: 2600,
+  scrollPauseProbability: 0.22,
+  scrollPauseMin: 3500,
+  scrollPauseMax: 12000,
 
   // Like Settings
   likeMinCount: 5,
   likeProbability: 0.8,
-  likeDelayMin: 5000,
-  likeDelayMax: 15000,
+  likeDelayMin: 15000,
+  likeDelayMax: 45000,
   likeCooldownHours: 24
 };
 
@@ -44,6 +44,7 @@ chrome.runtime.onInstalled.addListener(() => {
     
     // Initialize task start time
     if (result.taskStartTime === undefined) updates.taskStartTime = 0;
+    if (result.taskDeadlineTime === undefined) updates.taskDeadlineTime = 0;
 
     if (Object.keys(updates).length > 0) {
       chrome.storage.local.set(updates);
